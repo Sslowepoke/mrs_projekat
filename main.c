@@ -16,7 +16,7 @@
  * that is written to the CCR0 register is
  * 32768/1000 * X
  */
-#define TIMER_PERIOD_7SEG        (163)  /* ~5ms (4.97ms)  */
+#define TIMER_PERIOD_7SEG           (163)  /* ~5ms (4.97ms)  */
 
 /**
  * @brief Timer period for debouncing buttons
@@ -24,23 +24,20 @@
  * Timer is clocked by ACLK (32768Hz).
  * We want ~32ms period, so use 1023 for CCR0
  */
-#define TIMER_PERIOD_DEBOUNCE        (1048)  /* ~32ms (31.25ms) */
+#define TIMER_PERIOD_DEBOUNCE       (1048)  /* ~32ms (31.25ms) */
 
 // timer period for generating random numbers
 // Timer is clocked by ACLK (32768Hz).
 // We want ~200ms period, so use 6553 for CCR0
 #define TIMER_PERIOD_RNG            (6553) /* ~200ms */
 
-
 // broj brojeva koji se izvlace u lotou
-#define NUMBERS_LENGTH     (7)
+#define NUMBERS_LENGTH              (7)
 
-/** baud rate */
-#define BR9600      (3)
+// baud rate
+#define BR9600                      (3)
 
-/**
- * @brief array of digits used for display
- */
+// array of digits used for display
 static volatile uint8_t digits[2] = {0};
 
 // which button was pressed?
@@ -58,7 +55,7 @@ static volatile uint8_t number = 0;
 /**
  * @brief Function that populates digit array
  */
-void display(const uint16_t number)
+static inline void display(const uint16_t number)
 {
     uint16_t nr = number;
     uint8_t tmp;
@@ -69,10 +66,6 @@ void display(const uint16_t number)
     }
 }
 
-
-/**
- * main.c
- */
 int main(void)
 {
  	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
@@ -141,26 +134,17 @@ int main(void)
 	TA2CCTL0 = CCIE;                    // enable interrupt for TA2CCR0
 	TA2CTL = TASSEL__ACLK | MC__UP;    // clock select and up mode
 
-
-
-
-
-	display(16);
-
+	// enable interrupts
 	__enable_interrupt();
 
 	while(1) {
 	    //enter lpm
-
+		__bis_SR_register(LPM3_bits);
 	}
 }
 
 
-/**
- * @brief TA0CCR0 ISR
- *
- * Multiplex the 7seg display. Each ISR activates one digit.
- */
+// Multiplex the 7seg display. Each ISR activates one digit.
 void __attribute__ ((interrupt(TIMER0_A0_VECTOR))) TA0CCR0ISR (void)
 {
     static uint8_t current_digit = 0;
@@ -173,16 +157,14 @@ void __attribute__ ((interrupt(TIMER0_A0_VECTOR))) TA0CCR0ISR (void)
     if (current_digit == 1)
     {
         P6OUT |= BIT4;          // turn off SEL2
-        // DAT AIN'T OPTIMAL:
-        // treba izmestiti ovu funkciju van isr ili napraviti da nije funkcija ili da je inline
+        // trenutno je inline funkcija, mozda je treba izmestiti van isr
         WriteLed(digits[current_digit]);    // define seg a..g
         P7OUT &= ~BIT0;         // turn on SEL1
     }
     else if (current_digit == 0)
     {
         P7OUT |= BIT0;
-        // DAT AIN'T OPTIMAL:
-        // treba izmestiti ovu funkciju van isr ili napraviti da nije funkcija ili da je inline
+        // trenutno je inline funkcija, mozda je treba izmestiti van isr
         WriteLed(digits[current_digit]);
         P6OUT &= ~BIT4;
     }
@@ -191,17 +173,13 @@ void __attribute__ ((interrupt(TIMER0_A0_VECTOR))) TA0CCR0ISR (void)
     return;
 }
 
-/**
- * @brief PORT1 ISR
- * isr za dugmice
- */
+// isr za dugmice
 void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 {
     if ((P1IFG & BIT4) != 0)        // check if P1.4 flag is set
     {
-        button_pressed = 1;         //
-        /* start timer */
-        TA1CTL |= MC__UP;
+        button_pressed = 1;
+        TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT4;             // clear P1.4 flag
         P1IE &= ~(BIT4 | BIT5 | BIT1);  // disable interrupts for all buttons
@@ -210,9 +188,8 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 
     if ((P1IFG & BIT5) != 0)        // check if P1.5 flag is set
     {
-        button_pressed = 2;         //
-        /* start timer */
-        TA1CTL |= MC__UP;
+        button_pressed = 2;
+        TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT5;             // clear P1.5 flag
         P1IE &= ~(BIT4 | BIT5 | BIT1);  // disable interrupts for all buttons
@@ -221,9 +198,8 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 
     if ((P1IFG & BIT1) != 0)        // check if P1.1 flag is set
     {
-        button_pressed = 3;         //
-        /* start timer */
-        TA1CTL |= MC__UP;
+        button_pressed = 3;
+        TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT1;             // clear P1.1 flag
         P1IE &= ~(BIT4 | BIT5 | BIT1);  // disable interrupts for all buttons
@@ -253,7 +229,9 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
         if(number_count == 6)
         {
             // write En na LED
-            display(0);
+            digits[0] = 10;
+            digits[1] = 11;
+
             UCA1TXBUF = '\n';       // newline na uart
         }
         else
@@ -269,19 +247,19 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
             numbers[i] = 0;
         }
         number_count = 0;
-        TA2CTL |= MC__UP;       // start timer for rng in up mode
-        UCA1TXBUF = '\n';       // newline na uart
+        TA2CTL |= MC__UP;               // start timer for rng in up mode
+        UCA1TXBUF = '\n';               // newline na uart
     }
 
-    TA1CTL &= ~(MC0 | MC1);     // stop and clear debounce timer
+    TA1CTL &= ~(MC0 | MC1);             // stop and clear debounce timer
     TA1CTL |= TACLR;
-    P1IFG &= ~(BIT4 | BIT5 | BIT1);             // clear all button interrupt flags
-    P1IE |= (BIT4 | BIT5 | BIT1);               // enable all button interrupts
+    P1IFG &= ~(BIT4 | BIT5 | BIT1);     // clear all button interrupt flags
+    P1IE |= (BIT4 | BIT5 | BIT1);       // enable all button interrupts
 }
 
 void __attribute__ ((interrupt(TIMER2_A0_VECTOR))) TA2CCR0ISR (void) {
     uint8_t repeated_number = 1;
-    while(repeated_number) { // sve dok ne dobijemo broj koji nije vec bio, generisemo novi broj
+    while(repeated_number) {        // sve dok ne dobijemo broj koji nije vec bio, generisemo novi broj
         repeated_number = 0;
 
         CRCDI = 0x0000;             //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
