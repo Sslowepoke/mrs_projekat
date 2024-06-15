@@ -70,7 +70,7 @@
          0x06,
          0x06,
          0x06,
-         0x02
+         0x04
  };
 
  void WriteLed(unsigned int digit)

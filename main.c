@@ -57,6 +57,12 @@ static volatile uint8_t number_count = 0;
 // current number
 static volatile uint8_t number = 0;
 
+// we are currently rolling numbers
+static volatile uint8_t rolling = 1;
+
+// uart transmission data left
+static volatile uint8_t transmission_left = 0;
+
 
 /**
  * @brief Function that populates digit array
@@ -128,6 +134,9 @@ int main(void)
     UCA1MCTL |= UCBRS_3 + UCBRF_0;         // configure 9600 bps
 
     UCA1CTL1 &= ~UCSWRST;       // leave sw reset
+
+    // enable uart interrupt
+    UCA1IE |= UCTXIE;           // enable TX interrupt
 
     /*************************************************************
     * CRC init
@@ -224,9 +233,20 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
     // button STOP is still pressed
     if ((P1IN & BIT4) == 0 && button_pressed == STOP) // check if button is still pressed
     {
+        // ako NIJE radio rng nemamo broj koji bismo izvukli, dakle ne radi nista
+        // u asm bi mogli bit(bit test) ova 2 bita
+        if (!rolling) {
+            TA1CTL &= ~(MC0 | MC1);             // stop and clear debounce timer
+            TA1CTL |= TACLR;
+            P1IFG &= ~(BIT4 | BIT5 | BIT1);     // clear all button interrupt flags
+            P1IE |= (BIT4 | BIT5 | BIT1);       // enable all button interrupts
+            return;
+        }
         TA2CTL &= ~(MC0 | MC1);         // stop and clear timer for rng
         TA2CTL |= TACLR;
-        UCA1TXBUF = DIGIT2ASCII(number);  // send the current number
+        rolling = 0;
+        UCA1TXBUF = DIGIT2ASCII(digits[1]);  // send the current number
+        transmission_left = 2;
         numbers[number_count] = number;
         number_count += 1;
         button_pressed = NONE;
@@ -235,17 +255,19 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
     else if ((P1IN & BIT5) == 0 && button_pressed == START) // check if button is still pressed
     {
         // end of game
-        if(number_count == 6)
+        if(number_count == NUMBERS_LENGTH)
         {
             // write En na LED
-            digits[0] = 10;
-            digits[1] = 11;
+            digits[0] = 11;
+            digits[1] = 10;
 
             UCA1TXBUF = '\n';       // newline na uart
         }
+        // continue rolling
         else
         {
             TA2CTL |= MC__UP;       // start timer for rng in up mode
+            rolling = 1;
         }
         button_pressed = NONE;
     }
@@ -260,6 +282,7 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
         number_count = 0;
 
         TA2CTL |= MC__UP;               // start timer for rng in up mode
+        rolling = 1;
         UCA1TXBUF = '\n';               // newline na uart
 
         button_pressed = NONE;
@@ -277,8 +300,8 @@ void __attribute__ ((interrupt(TIMER2_A0_VECTOR))) TA2CCR0ISR (void) {
     while(repeated_number) {        // sve dok ne dobijemo broj koji nije vec bio, generisemo novi broj
         repeated_number = 0;
 
-        // CRCDI = 0x0000;              //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
-        __asm__("MOV.B  #0h, CRCDI");   //stavimo byte nula
+         CRCDI = 0x0000;              //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
+//        __asm__("MOV.B  #0h, CRCDI");   //stavimo byte nula
 
         number = CRCINIRES & 0x001f;    // poslednjih 5 bita rezulata je nas broj
 
@@ -291,4 +314,24 @@ void __attribute__ ((interrupt(TIMER2_A0_VECTOR))) TA2CCR0ISR (void) {
         }
     }
     display(number);
+}
+
+// uart isr
+void __attribute__ ((interrupt(USCI_A1_VECTOR))) USCIA1 (void)
+{
+    if(UCA1IV == USCI_UCTXIFG) {
+        switch(transmission_left) {
+            case 2:
+                UCA1TXBUF = DIGIT2ASCII(digits[0]);
+                transmission_left--;
+                break;
+            case 1:
+                UCA1TXBUF = ' ';
+                transmission_left--;
+                break;
+
+        }
+
+    }
+
 }
