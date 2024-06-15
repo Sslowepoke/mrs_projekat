@@ -28,7 +28,7 @@
 
 // timer period for generating random numbers
 // Timer is clocked by ACLK (32768Hz).
-// We want ~200ms period, so use 6553 for CCR0
+// We want ~200ms period, so use 6553 forCCR0
 #define TIMER_PERIOD_RNG            (6553) /* ~200ms */
 
 // broj brojeva koji se izvlace u lotou
@@ -41,16 +41,22 @@
 static volatile uint8_t digits[2] = {0};
 
 // which button was pressed?
-static volatile uint8_t button_pressed = 0;
+enum buttons{NONE, START, STOP, RESET};
+
+static volatile enum buttons button_pressed = NONE;
 
 // array of pulled numbers
 static volatile uint8_t numbers[NUMBERS_LENGTH] = {0};
+// note - posto ovih brojeva ima 7, mogli smo verovatno
+// da ih stavimo u registre da bi kod bio brzi
+// ne znam da li kompajler to svakako radi
 
 // index of the number we are currently pulling
 static volatile uint8_t number_count = 0;
 
 // current number
 static volatile uint8_t number = 0;
+
 
 /**
  * @brief Function that populates digit array
@@ -94,7 +100,7 @@ int main(void)
     /*************************************************************
 	* buttons init
 	*************************************************************/
-    // configure button S2, S3 and S4
+    // configure button S2, S3 and S4 (RESET, STOP, START)
     P1REN |= BIT1 | BIT4 | BIT5;       // enable pull up/down
     P1OUT |= BIT1 | BIT4 | BIT5;       // set pull up
     P1DIR &= ~(BIT1 | BIT4 | BIT5);    // configure P1.4 as in
@@ -103,6 +109,7 @@ int main(void)
     P1IE  |= BIT1 | BIT4 | BIT5;       // enable interrupt
 
     /* initialize Timer A1 */
+    // timer for debouncing button signals
     TA1CCR0 = TIMER_PERIOD_DEBOUNCE;     // debounce period
     TA1CCTL0 = CCIE;            // enable CCR0 interrupt
     TA1CTL = TASSEL__ACLK;
@@ -129,9 +136,9 @@ int main(void)
 	CRCDI |= 0x0000;           // nisam siguran da ovo treba al ne kvari nista,
 	                           // pomeri na pocetku za 16 nula CRC modul
 
-	// init TA2
+	// init TA2, triggeruje rng
 	TA2CCR0 = TIMER_PERIOD_RNG;        // set timer period in CCR0 register
-	TA2CCTL0 = CCIE;                    // enable interrupt for TA2CCR0
+	TA2CCTL0 = CCIE;                   // enable interrupt for TA2CCR0
 	TA2CTL = TASSEL__ACLK | MC__UP;    // clock select and up mode
 
 	// enable interrupts
@@ -178,7 +185,7 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 {
     if ((P1IFG & BIT4) != 0)        // check if P1.4 flag is set
     {
-        button_pressed = 1;
+        button_pressed = STOP;
         TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT4;             // clear P1.4 flag
@@ -188,7 +195,7 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 
     if ((P1IFG & BIT5) != 0)        // check if P1.5 flag is set
     {
-        button_pressed = 2;
+        button_pressed = START;
         TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT5;             // clear P1.5 flag
@@ -198,7 +205,7 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 
     if ((P1IFG & BIT1) != 0)        // check if P1.1 flag is set
     {
-        button_pressed = 3;
+        button_pressed = RESET;
         TA1CTL |= MC__UP;           // start timer
 
         P1IFG &= ~BIT1;             // clear P1.1 flag
@@ -214,18 +221,20 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
  */
 void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
 {
-    // button 1 is still pressed
-    if ((P1IN & BIT4) == 0 && button_pressed == 1) // check if button is still pressed
+    // button STOP is still pressed
+    if ((P1IN & BIT4) == 0 && button_pressed == STOP) // check if button is still pressed
     {
         TA2CTL &= ~(MC0 | MC1);         // stop and clear timer for rng
         TA2CTL |= TACLR;
         UCA1TXBUF = DIGIT2ASCII(number);  // send the current number
         numbers[number_count] = number;
         number_count += 1;
+        button_pressed = NONE;
     }
-    // button 2 is still pressed
-    else if ((P1IN & BIT5) == 0 && button_pressed == 2) // check if button is still pressed
+    // button START is still pressed
+    else if ((P1IN & BIT5) == 0 && button_pressed == START) // check if button is still pressed
     {
+        // end of game
         if(number_count == 6)
         {
             // write En na LED
@@ -238,17 +247,22 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
         {
             TA2CTL |= MC__UP;       // start timer for rng in up mode
         }
+        button_pressed = NONE;
     }
-    // button 3 is still pressed
-    else if ((P1IN & BIT1) == 0 && button_pressed == 3) // check if button is still pressed
+    // button RESET is still pressed
+    else if ((P1IN & BIT1) == 0 && button_pressed == RESET) // check if button is still pressed
     {
+        // clear numbers
         uint8_t i = 0;
         for(i = 0; i < NUMBERS_LENGTH; i++) {
             numbers[i] = 0;
         }
         number_count = 0;
+
         TA2CTL |= MC__UP;               // start timer for rng in up mode
         UCA1TXBUF = '\n';               // newline na uart
+
+        button_pressed = NONE;
     }
 
     TA1CTL &= ~(MC0 | MC1);             // stop and clear debounce timer
@@ -257,13 +271,16 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TA1CCR0ISR (void)
     P1IE |= (BIT4 | BIT5 | BIT1);       // enable all button interrupts
 }
 
+// RNG
 void __attribute__ ((interrupt(TIMER2_A0_VECTOR))) TA2CCR0ISR (void) {
     uint8_t repeated_number = 1;
     while(repeated_number) {        // sve dok ne dobijemo broj koji nije vec bio, generisemo novi broj
         repeated_number = 0;
 
-        CRCDI = 0x0000;             //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
-        number = CRCINIRES &0x001f; // poslednjih 5 bita rezulata je nas broj
+        // CRCDI = 0x0000;              //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
+        __asm__("MOV.B  #0h, CRCDI");   //stavimo byte nula
+
+        number = CRCINIRES & 0x001f;    // poslednjih 5 bita rezulata je nas broj
 
         // proveravamo da li smo vec izvukli ovaj broj
         uint8_t i = 0;

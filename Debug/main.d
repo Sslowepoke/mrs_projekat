@@ -16,7 +16,7 @@ main.obj: /Applications/ti/ccs1270/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/i
 main.obj: /Applications/ti/ccs1270/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include/machine/_types.h
 main.obj: /Applications/ti/ccs1270/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include/machine/_stdint.h
 main.obj: /Applications/ti/ccs1270/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include/sys/_stdint.h
-main.obj: /Users/slowepoke/Documents/fax/6.\ semestar/mrs/vezbe/ccs_workspace/vz_2021_0379_projekat/function.h
+main.obj: /Users/slowepoke/Documents/fax/6.\ semestar/mrs/vezbe/ccs_workspace/mrs_projekat/function.h
 
 ../main.c:
 
@@ -50,5 +50,5 @@ main.obj: /Users/slowepoke/Documents/fax/6.\ semestar/mrs/vezbe/ccs_workspace/vz
 
 /Applications/ti/ccs1270/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include/sys/_stdint.h:
 
-/Users/slowepoke/Documents/fax/6.\ semestar/mrs/vezbe/ccs_workspace/vz_2021_0379_projekat/function.h:
+/Users/slowepoke/Documents/fax/6.\ semestar/mrs/vezbe/ccs_workspace/mrs_projekat/function.h:
 

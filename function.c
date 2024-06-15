@@ -10,6 +10,8 @@
 
  /**
   * Table of settings for a-g lines for appropriate digit
+  * digit 11 is E
+  * digit 12 is n
   */
  const unsigned int segtab2[] = {
 		0x48,
@@ -21,7 +23,9 @@
 		0x48,
 		0x40,
 		0x48,
-		0x40
+		0x40,
+		0x08,
+		0x48
  };
 
  const unsigned int segtab3[] = {
@@ -34,7 +38,9 @@
          0x80,
          0x80,
          0x80,
-         0x80
+         0x80,
+         0x80,
+         0x00
  };
 
  const unsigned int segtab4[] = {
@@ -47,7 +53,9 @@
          0x01,
          0x08,
          0x09,
-         0x09
+         0x09,
+         0x01,
+         0x00
  };
 
  const unsigned int segtab8[] = {
@@ -60,7 +68,9 @@
          0x06,
          0x00,
          0x06,
-         0x06
+         0x06,
+         0x06,
+         0x02
  };
 
  void WriteLed(unsigned int digit)
