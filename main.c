@@ -300,8 +300,8 @@ void __attribute__ ((interrupt(TIMER2_A0_VECTOR))) TA2CCR0ISR (void) {
     while(repeated_number) {        // sve dok ne dobijemo broj koji nije vec bio, generisemo novi broj
         repeated_number = 0;
 
-         CRCDI = 0x0000;              //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
-//        __asm__("MOV.B  #0h, CRCDI");   //stavimo byte nula
+        // CRCDI = 0x0000;              //stavimo sve nule u input za crc, ovo ce da generise slucajan broj
+        asm(" MOV.B  #0h, CRCDI");   //stavimo byte nula
 
         number = CRCINIRES & 0x001f;    // poslednjih 5 bita rezulata je nas broj
 
